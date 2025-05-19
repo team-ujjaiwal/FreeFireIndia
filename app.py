@@ -186,22 +186,22 @@ def process_token(uid, password):
         }
 
 @app.route('/token', methods=['GET'])
-@cache.cached(timeout=25200)  # Cache for 7 hours
+@cache.cached(timeout=25200)
 def get_responses():
-    # Load only first 100 UID-password pairs
-    tokens = load_tokens("accs.txt", limit=100)
-    responses = []
+    tokens = load_tokens("accs.txt", limit=100)  # Load first 100
+    jwt_tokens = []
 
     with ThreadPoolExecutor(max_workers=15) as executor:
         future_to_uid = {executor.submit(process_token, uid, password): uid for uid, password in tokens}
         for future in as_completed(future_to_uid):
             try:
-                response = future.result()
-                responses.append(response)
-            except Exception as e:
-                responses.append({"uid": future_to_uid[future], "error": str(e)})
+                result = future.result()
+                if "token" in result:
+                    jwt_tokens.append(result["token"])
+            except Exception:
+                continue  # Ignore any errors
 
-    return jsonify(responses)
+    return jsonify({"tokens": jwt_tokens})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=50011)
