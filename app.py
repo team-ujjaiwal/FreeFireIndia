@@ -186,16 +186,13 @@ def process_token(uid, password):
         }
 
 @app.route('/token', methods=['GET'])
-@cache.cached(timeout=25200)  # تخزين النتائج لمدة 7 ساعات
+@cache.cached(timeout=25200)  # Cache results for 7 hours
 def get_responses():
-    # الحصول على عدد التوكنات المطلوبة من query parameter (افتراضيًا 100)
-    limit = request.args.get('limit', default=1, type=int)
-
-    # تحميل التوكنات من ملف accs.txt مع تحديد الحد الأقصى
-    tokens = load_tokens("accs.txt", limit)
+    # Load ALL tokens (no limit)
+    tokens = load_tokens("accs.txt")  # Removed limit parameter
     responses = []
 
-    # استخدام ThreadPoolExecutor لتنفيذ المهام بشكل متوازي
+    # Use ThreadPoolExecutor for parallel execution
     with ThreadPoolExecutor(max_workers=15) as executor:
         future_to_uid = {executor.submit(process_token, uid, password): uid for uid, password in tokens}
         for future in as_completed(future_to_uid):
