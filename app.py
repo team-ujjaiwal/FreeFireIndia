@@ -151,7 +151,7 @@ def process_token(uid, password):
         'Expect': "100-continue",
         'X-Unity-Version': "2018.4.11f1",
         'X-GA': "v1 1",
-        'ReleaseVersion': "OB49"
+        'ReleaseVersion': "OB48"
     }
     edata = bytes.fromhex(hex_encrypted_data)
 
@@ -186,26 +186,23 @@ def process_token(uid, password):
         }
 
 @app.route('/token', methods=['GET'])
-@cache.cached(timeout=25200)  # تخزين النتائج لمدة 7 ساعات
+@cache.cached(timeout=25200)
 def get_responses():
-    # الحصول على عدد التوكنات المطلوبة من query parameter (افتراضيًا 100)
-    limit = request.args.get('limit', default=10, type=int)
+    # Load only first 30 UID-passwords from accs.txt
+    tokens = load_tokens("accs.txt", limit=30)
+    jwt_tokens = []
 
-    # تحميل التوكنات من ملف accs.txt مع تحديد الحد الأقصى
-    tokens = load_tokens("accs.txt", limit)
-    responses = []
-
-    # استخدام ThreadPoolExecutor لتنفيذ المهام بشكل متوازي
-    with ThreadPoolExecutor(max_workers=15) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:  # Reduced for safety
         future_to_uid = {executor.submit(process_token, uid, password): uid for uid, password in tokens}
         for future in as_completed(future_to_uid):
             try:
-                response = future.result()
-                responses.append(response)
-            except Exception as e:
-                responses.append({"uid": future_to_uid[future], "error": str(e)})
+                result = future.result()
+                if result and "token" in result:
+                    jwt_tokens.append(result["token"])
+            except Exception:
+                continue  # Skip on error
 
-    return jsonify(responses)
+    return jsonify({"tokens": jwt_tokens})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=50011)
